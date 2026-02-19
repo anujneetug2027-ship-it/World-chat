@@ -2,12 +2,8 @@
 <html>
 <head>
   <title>Common Chat</title>
-
   <style>
-    body {
-      font-family: Arial;
-      background: #f2f2f2;
-    }
+    body { font-family: Arial; background: #f2f2f2; }
     #login, #chat {
       width: 400px;
       margin: 50px auto;
@@ -16,18 +12,11 @@
       border-radius: 5px;
     }
     #messages {
-      height: 200px;
+      height: 250px;
       border: 1px solid #ccc;
       overflow-y: auto;
       margin-bottom: 10px;
       padding: 5px;
-    }
-    input {
-      width: 75%;
-      padding: 5px;
-    }
-    button {
-      padding: 6px 10px;
     }
   </style>
 </head>
@@ -36,93 +25,82 @@
 <div id="login">
   <h2>Enter Username</h2>
   <input id="username" placeholder="Your name">
-  <button onclick="joinChat()">Join</button>
+  <button onclick="manualJoin()">Join</button>
 </div>
 
 <div id="chat" style="display:none;">
-  <h2>Common Chat Room</h2>
+  <h2>Common Chat</h2>
   <div id="messages"></div>
   <input id="msg" placeholder="Type message">
   <button onclick="sendMessage()">Send</button>
 </div>
+
 <script src="/socket.io/socket.io.js"></script>
 
 <script>
   const socket = io();
-  let currentUser = "";
+  let joined = false;
 
-  function setCookie(name, value, minutes) {
-    const d = new Date();
-    d.setTime(d.getTime() + (minutes * 60 * 1000));
-    document.cookie = name + "=" + value + ";expires=" + d.toUTCString() + ";path=/";
+  function setCookie(name, value) {
+    document.cookie = name + "=" + value + ";path=/";
   }
 
   function getCookie(name) {
-    const cname = name + "=";
-    const decodedCookie = decodeURIComponent(document.cookie);
-    const ca = decodedCookie.split(';');
-    for (let i = 0; i < ca.length; i++) {
-      let c = ca[i].trim();
-      if (c.indexOf(cname) === 0) {
-        return c.substring(cname.length, c.length);
-      }
-    }
-    return "";
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
   }
 
-  function joinChat(usernameFromInput = null) {
-    const username = usernameFromInput || document.getElementById("username").value;
-    if (!username) {
-      alert("Enter username");
-      return;
-    }
-
-    currentUser = username;
-
-    setCookie("username", username, 60);
-
-    socket.emit("join", username);
-
+  function showChat() {
     document.getElementById("login").style.display = "none";
     document.getElementById("chat").style.display = "block";
   }
 
-  function sendMessage() {
-    const msgInput = document.getElementById("msg");
-    const message = msgInput.value;
-
-    if (message.trim() === "") return;
-
-    socket.emit("sendMessage", message);
-    msgInput.value = "";
+  function manualJoin() {
+    const username = document.getElementById("username").value.trim();
+    if (!username) return alert("Enter username");
+    setCookie("username", username);
+    joinAfterConnect(username);
   }
 
-  // Load old messages
+  function joinAfterConnect(username) {
+    if (joined) return;
+    socket.emit("join", username);
+    joined = true;
+    showChat();
+  }
+
+  function sendMessage() {
+    const input = document.getElementById("msg");
+    const msg = input.value.trim();
+    if (!msg) return;
+    socket.emit("sendMessage", msg);
+    input.value = "";
+  }
+
+  socket.on("connect", () => {
+    const savedUser = getCookie("username");
+    if (savedUser) {
+      joinAfterConnect(savedUser);
+    }
+  });
+
   socket.on("oldMessages", (oldMsgs) => {
-    const messagesDiv = document.getElementById("messages");
-    messagesDiv.innerHTML = ""; // clear before loading
-    oldMsgs.forEach((data) => {
+    const box = document.getElementById("messages");
+    box.innerHTML = "";
+    oldMsgs.forEach((m) => {
       const div = document.createElement("div");
-      div.innerHTML = `<b>${data.user}:</b> ${data.text}`;
-      messagesDiv.appendChild(div);
+      div.innerHTML = `<b>${m.user}:</b> ${m.text}`;
+      box.appendChild(div);
     });
   });
 
-  // Receive new messages
   socket.on("message", (data) => {
     const div = document.createElement("div");
     div.innerHTML = `<b>${data.user}:</b> ${data.text}`;
     document.getElementById("messages").appendChild(div);
   });
-
-  // Auto login on refresh
-  window.onload = function () {
-    const savedUser = getCookie("username");
-    if (savedUser) {
-      joinChat(savedUser);
-    }
-  };
 </script>
 
 </body>
-  </html>
+</html>
