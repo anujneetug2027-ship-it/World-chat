@@ -6,7 +6,7 @@
     body { font-family: Arial; background: #f2f2f2; }
     #login, #chat {
       width: 400px;
-      margin: 50px auto;
+      margin: 40px auto;
       background: white;
       padding: 20px;
       border-radius: 5px;
@@ -17,6 +17,14 @@
       overflow-y: auto;
       margin-bottom: 10px;
       padding: 5px;
+    }
+    .msg-time {
+      font-size: 11px;
+      color: gray;
+      float: right;
+    }
+    .top-buttons {
+      margin-bottom: 10px;
     }
   </style>
 </head>
@@ -30,7 +38,14 @@
 
 <div id="chat" style="display:none;">
   <h2>Common Chat</h2>
+
+  <div class="top-buttons">
+    <button onclick="exitChat()">Exit Chat</button>
+    <button onclick="clearChat()">Clear Chat</button>
+  </div>
+
   <div id="messages"></div>
+
   <input id="msg" placeholder="Type message">
   <button onclick="sendMessage()">Send</button>
 </div>
@@ -43,6 +58,10 @@
 
   function setCookie(name, value) {
     document.cookie = name + "=" + value + ";path=/";
+  }
+
+  function deleteCookie(name) {
+    document.cookie = name + "=; Max-Age=0; path=/;";
   }
 
   function getCookie(name) {
@@ -78,6 +97,15 @@
     input.value = "";
   }
 
+  function exitChat() {
+    deleteCookie("username");
+    location.reload();
+  }
+
+  function clearChat() {
+    socket.emit("clearChat");
+  }
+
   socket.on("connect", () => {
     const savedUser = getCookie("username");
     if (savedUser) {
@@ -88,19 +116,24 @@
   socket.on("oldMessages", (oldMsgs) => {
     const box = document.getElementById("messages");
     box.innerHTML = "";
-    oldMsgs.forEach((m) => {
-      const div = document.createElement("div");
-      div.innerHTML = `<b>${m.user}:</b> ${m.text}`;
-      box.appendChild(div);
-    });
+    oldMsgs.forEach(addMessage);
   });
 
-  socket.on("message", (data) => {
-    const div = document.createElement("div");
-    div.innerHTML = `<b>${data.user}:</b> ${data.text}`;
-    document.getElementById("messages").appendChild(div);
+  socket.on("message", addMessage);
+
+  socket.on("chatCleared", () => {
+    document.getElementById("messages").innerHTML = "";
   });
+
+  function addMessage(data) {
+    const div = document.createElement("div");
+    div.innerHTML = `
+      <b>${data.user}:</b> ${data.text}
+      <span class="msg-time">${data.time}</span>
+    `;
+    document.getElementById("messages").appendChild(div);
+  }
 </script>
 
 </body>
-</html>
+  </html>
