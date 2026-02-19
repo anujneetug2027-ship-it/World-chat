@@ -7,22 +7,23 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Store messages temporarily in memory
 let messages = [];
+let users = {}; // socket.id -> username
 
-// Serve frontend folder
 app.use(express.static(path.join(__dirname, "../frontend")));
 
 io.on("connection", (socket) => {
-  console.log("User connected");
+  console.log("User connected:", socket.id);
 
   socket.on("join", (username) => {
-    socket.username = username;
+    if (!username) return;
 
-    // Send old messages only to this user
+    users[socket.id] = username;
+
+    // Send old messages ONLY to this user
     socket.emit("oldMessages", messages);
 
-    // Notify everyone
+    // Notify others (not duplicate for same reconnect)
     io.emit("message", {
       user: "System",
       text: `${username} joined the chat`
@@ -30,38 +31,37 @@ io.on("connection", (socket) => {
   });
 
   socket.on("sendMessage", (msg) => {
-    if (!socket.username) return;
+    const username = users[socket.id];
+    if (!username || !msg.trim()) return;
 
     const messageData = {
-      user: socket.username,
+      user: username,
       text: msg
     };
 
-    // Save message in memory
     messages.push(messageData);
 
-    // Optional: limit memory to last 100 messages
-    if (messages.length > 100) {
+    // Keep only last 200 messages
+    if (messages.length > 200) {
       messages.shift();
     }
 
-    // Broadcast to all users
     io.emit("message", messageData);
   });
 
   socket.on("disconnect", () => {
-    if (socket.username) {
+    const username = users[socket.id];
+    if (username) {
       io.emit("message", {
         user: "System",
-        text: `${socket.username} left the chat`
+        text: `${username} left the chat`
       });
+      delete users[socket.id];
     }
   });
 });
 
-// Use dynamic port for Render deployment
 const PORT = process.env.PORT || 3000;
-
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
