@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Common Chat</title>
+
+  <style>
+    body {
+      font-family: Arial;
+      background: #f2f2f2;
+    }
+    #login, #chat {
+      width: 400px;
+      margin: 50px auto;
+      background: white;
+      padding: 20px;
+      border-radius: 5px;
+    }
+    #messages {
+      height: 200px;
+      border: 1px solid #ccc;
+      overflow-y: auto;
+      margin-bottom: 10px;
+      padding: 5px;
+    }
+    input {
+      width: 75%;
+      padding: 5px;
+    }
+    button {
+      padding: 6px 10px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="login">
+  <h2>Enter Username</h2>
+  <input id="username" placeholder="Your name">
+  <button onclick="joinChat()">Join</button>
+</div>
+
+<div id="chat" style="display:none;">
+  <h2>Common Chat Room</h2>
+  <div id="messages"></div>
+  <input id="msg" placeholder="Type message">
+  <button onclick="sendMessage()">Send</button>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+
+<script>
+  const socket = io();
+
+  function joinChat() {
+    const username = document.getElementById("username").value;
+    if (!username) {
+      alert("Enter username");
+      return;
+    }
+
+    socket.emit("join", username);
+    document.getElementById("login").style.display = "none";
+    document.getElementById("chat").style.display = "block";
+  }
+
+  function sendMessage() {
+    const msgInput = document.getElementById("msg");
+    const message = msgInput.value;
+
+    if (message.trim() === "") return;
+
+    socket.emit("sendMessage", message);
+    msgInput.value = "";
+  }
+
+  socket.on("message", (data) => {
+    const div = document.createElement("div");
+    div.innerHTML = `<b>${data.user}:</b> ${data.text}`;
+    document.getElementById("messages").appendChild(div);
+  });
+</script>
+
+</body>
+  </html>
