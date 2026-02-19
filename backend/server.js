@@ -12,21 +12,29 @@ let users = {}; // socket.id -> username
 
 app.use(express.static(path.join(__dirname, "../frontend")));
 
+// Function to clean messages older than 24 hours
+function cleanOldMessages() {
+  const now = Date.now();
+  messages = messages.filter(msg => now - msg.createdAt < 24 * 60 * 60 * 1000);
+}
+
 io.on("connection", (socket) => {
-  console.log("User connected:", socket.id);
 
   socket.on("join", (username) => {
     if (!username) return;
 
     users[socket.id] = username;
 
-    // Send old messages ONLY to this user
-    socket.emit("oldMessages", messages);
+    cleanOldMessages();
 
-    // Notify others (not duplicate for same reconnect)
+    // Send only last 10 messages
+    const lastMessages = messages.slice(-10);
+    socket.emit("oldMessages", lastMessages);
+
     io.emit("message", {
       user: "System",
-      text: `${username} joined the chat`
+      text: `${username} joined the chat`,
+      time: new Date().toLocaleTimeString()
     });
   });
 
@@ -34,19 +42,28 @@ io.on("connection", (socket) => {
     const username = users[socket.id];
     if (!username || !msg.trim()) return;
 
+    cleanOldMessages();
+
     const messageData = {
       user: username,
-      text: msg
+      text: msg,
+      time: new Date().toLocaleTimeString(),
+      createdAt: Date.now()
     };
 
     messages.push(messageData);
 
-    // Keep only last 200 messages
-    if (messages.length > 200) {
+    // Keep only last 10 stored
+    if (messages.length > 10) {
       messages.shift();
     }
 
     io.emit("message", messageData);
+  });
+
+  socket.on("clearChat", () => {
+    messages = [];
+    io.emit("chatCleared");
   });
 
   socket.on("disconnect", () => {
@@ -54,7 +71,8 @@ io.on("connection", (socket) => {
     if (username) {
       io.emit("message", {
         user: "System",
-        text: `${username} left the chat`
+        text: `${username} left the chat`,
+        time: new Date().toLocaleTimeString()
       });
       delete users[socket.id];
     }
